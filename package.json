@@ -1,0 +1,25 @@
+{
+  "name": "tchat",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node server.js",
+    "c": "node client.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Seba010d/TChat.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Seba010d/TChat/issues"
+  },
+  "homepage": "https://github.com/Seba010d/TChat#readme",
+  "dependencies": {
+    "dotenv": "^18.0.3"
+  }
+}
