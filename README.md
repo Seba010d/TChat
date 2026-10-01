@@ -1,12 +1,8 @@
 # TChat
 
-Start Server = npm start
-
+Start Server = npm start<br />
 Start Client = npm run c
 
-
-download folder with TChat
-
-Npm install
-
+download folder with TChat<br />
+Npm install<br />
 Npm run c
