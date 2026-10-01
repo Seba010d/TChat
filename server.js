@@ -2,6 +2,8 @@ const net = require("net");
 const dgram = require("dgram");
 const os = require("os");
 
+const { startServerConsole } = require("./server-console");
+
 const { createUser, findUser, removeUser, isUsernameTaken } = require("./users");
 
 const { handleCommand } = require("./commands");
@@ -9,6 +11,15 @@ const { handleCommand } = require("./commands");
 const { isAdmin, isAdminCommand, handleAdminCommand } = require("./admin");
 
 const clients = [];
+let serverConsole;
+
+function logServer(message) {
+  if (serverConsole) {
+    serverConsole.log(message);
+  } else {
+    console.log(message);
+  }
+}
 
 function getUserColor() {
   const hue = (clients.length * 137.5) % 360;
@@ -69,9 +80,13 @@ const server = net.createServer((socket) => {
   let username = "";
   let authenticated = false;
 
-  console.log("A client connected!");
+  logServer("A client connected!");
 
   socket.on("data", (data) => {
+    if (server.isShuttingDown) {
+      return;
+    }
+
     const message = data.toString().trim();
 
     if (!authenticated && message.startsWith("USERNAME:")) {
@@ -96,7 +111,7 @@ const server = net.createServer((socket) => {
       clients.push(user);
       authenticated = true;
 
-      console.log(`${username} joined TChat!`);
+      logServer(`${username} joined TChat!`);
 
       socket.write(`Welcome, ${username}!\n`);
 
@@ -144,7 +159,7 @@ const server = net.createServer((socket) => {
 
         socket.write("ADMIN_LOGIN_SUCCESS\n");
 
-        console.log(`${username} logged in as ADMIN!`);
+        logServer(`${username} logged in as ADMIN!`);
       } else {
         socket.write("ADMIN_LOGIN_FAILED\n");
       }
@@ -206,7 +221,7 @@ const server = net.createServer((socket) => {
       });
     }
 
-    console.log(`${username} says: ${message}`);
+    logServer(`${username} says: ${message}`);
 
     clients.forEach((client) => {
       client.socket.write(`${username}: ${message}\n`);
@@ -224,7 +239,11 @@ const server = net.createServer((socket) => {
       return;
     }
 
-    console.log(`${user.username} left TChat!`);
+    if (server.isShuttingDown) {
+      return;
+    }
+
+    logServer(`${user.username} left TChat!`);
 
     clients.forEach((client) => {
       client.socket.write(`${user.username} left TChat!\n`);
@@ -259,4 +278,6 @@ server.listen(3000, "0.0.0.0", () => {
   }
 
   console.log("Clients on the same Wi-Fi can discover this server automatically.");
+  console.log("Type help for server console commands.");
+  serverConsole = startServerConsole({ clients, server, discoveryServer });
 });
