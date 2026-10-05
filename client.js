@@ -14,9 +14,31 @@ const rl = readline.createInterface({
   output: process.stdout,
 });
 
-rl.question("Choose a username to join the chat.\n", (name) => {
-  username = name;
+function showLogin() {
+  console.clear();
 
+  console.log("╭────────────────────────────────────────╮");
+  console.log("│                  TCHAT                 │");
+  console.log("╰────────────────────────────────────────╯");
+
+  console.log("");
+  console.log("Choose your username.");
+  console.log("");
+
+  rl.question("> ", (name) => {
+    username = name.trim();
+
+    if (!username) {
+      showLogin();
+      return;
+    }
+
+    rl.close();
+    connectToServer();
+  });
+}
+
+function connectToServer() {
   const client = net.createConnection(
     {
       host: "192.168.0.14",
@@ -108,7 +130,14 @@ rl.question("Choose a username to join the chat.\n", (name) => {
         console.log("");
         console.log("Admin adgangskode:");
 
-        rl.question("> ", (password) => {
+        const passwordRl = readline.createInterface({
+          input: process.stdin,
+          output: process.stdout,
+        });
+
+        passwordRl.question("> ", (password) => {
+          passwordRl.close();
+
           waitingForAdminPassword = false;
 
           client.write(`ADMIN_PASSWORD:${password}\n`);
@@ -160,6 +189,12 @@ rl.question("Choose a username to join the chat.\n", (name) => {
   client.on("error", (error) => {
     process.stdin.setRawMode(false);
 
+    console.clear();
+
+    console.log("╭────────────────────────────────────────╮");
+    console.log("│              TCHAT ERROR               │");
+    console.log("╰────────────────────────────────────────╯");
+
     console.log("");
     console.log(`Connection error: ${error.message}`);
 
@@ -174,4 +209,6 @@ rl.question("Choose a username to join the chat.\n", (name) => {
 
     process.exit();
   });
-});
+}
+
+showLogin();
