@@ -5,19 +5,21 @@ function draw(messages, input, username, userColors) {
 
   const rows = process.stdout.rows || 24;
 
+  const width = Math.max(20, columns);
+
   console.clear();
 
-  const border = `${colors.brightCyan}`;
-
-  console.log(`${border}╭${"─".repeat(columns - 2)}╮${colors.reset}`);
+  console.log(`${colors.brightCyan}╭${"─".repeat(width - 2)}╮${colors.reset}`);
 
   const title = "TCHAT";
 
-  const titlePadding = Math.max(0, Math.floor((columns - 2 - title.length) / 2));
+  const titlePadding = Math.max(0, Math.floor((width - 2 - title.length) / 2));
 
-  console.log(`${border}│${colors.reset}` + " ".repeat(titlePadding) + `${colors.brightPurple}${title}${colors.reset}` + " ".repeat(Math.max(0, columns - 2 - titlePadding - title.length)) + `${border}│${colors.reset}`);
+  const rightPadding = Math.max(0, width - 2 - titlePadding - title.length);
 
-  console.log(`${border}╰${"─".repeat(columns - 2)}╯${colors.reset}`);
+  console.log(`${colors.brightCyan}│${colors.reset}` + " ".repeat(titlePadding) + `${colors.brightPurple}${title}${colors.reset}` + " ".repeat(rightPadding) + `${colors.brightCyan}│${colors.reset}`);
+
+  console.log(`${colors.brightCyan}╰${"─".repeat(width - 2)}╯${colors.reset}`);
 
   console.log("");
 
@@ -41,7 +43,7 @@ function draw(messages, input, username, userColors) {
     console.log("");
   }
 
-  console.log(`${colors.gray}${"─".repeat(columns)}${colors.reset}`);
+  console.log(`${colors.gray}${"─".repeat(width)}${colors.reset}`);
 
   process.stdout.write(`${colors.brightGreen}> ${colors.reset}${input}`);
 }

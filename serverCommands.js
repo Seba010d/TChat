@@ -1,5 +1,6 @@
 function handleServerCommand(command, clients, server) {
-  const parts = command.trim().split(" ");
+  const parts = command.trim().split(/\s+/);
+
   const commandName = parts[0].toLowerCase();
 
   if (commandName === "help") {

@@ -5,15 +5,11 @@ function isAdmin(username, password) {
 }
 
 function isAdminCommand(message) {
-  return message === "/clear" || message === "/adminlist" || message === "/op" || message.startsWith("/op ") || message === "/deop" || message.startsWith("/deop ") || message.startsWith("/kick ") || message.startsWith("/mute ") || message.startsWith("/unmute ") || message.startsWith("/announce ");
+  return message === "/clear" || message.startsWith("/kick ") || message.startsWith("/mute ") || message.startsWith("/unmute ") || message.startsWith("/announce ");
 }
 
-function notifyAdmins(clients, message) {
-  clients.forEach((client) => {
-    if (client.isAdmin) {
-      client.socket.write(`${message}\n`);
-    }
-  });
+function findTarget(clients, username) {
+  return clients.find((client) => client.username.toLowerCase() === username.toLowerCase());
 }
 
 function handleAdminCommand(socket, username, message, clients) {
@@ -21,95 +17,6 @@ function handleAdminCommand(socket, username, message, clients) {
 
   if (!user || !user.isAdmin) {
     socket.write("You do not have permission to use this command.\n");
-
-    return true;
-  }
-
-  if (message === "/adminlist") {
-    const admins = clients.filter((client) => client.isAdmin);
-
-    if (admins.length === 0) {
-      socket.write("No admins are online.\n");
-
-      return true;
-    }
-
-    socket.write("Online admins:\n");
-    admins.forEach((admin) => {
-      socket.write(`- ${admin.username}\n`);
-    });
-
-    return true;
-  }
-
-  if (message === "/op" || message.startsWith("/op ")) {
-    const targetUsername = message.slice(3).trim();
-
-    if (!targetUsername) {
-      socket.write("Usage: /op <name>\n");
-
-      return true;
-    }
-
-    const target = clients.find((client) => client.username.toLowerCase() === targetUsername.toLowerCase());
-
-    if (!target) {
-      socket.write(`User ${targetUsername} is not online.\n`);
-
-      return true;
-    }
-
-    if (target.isAdmin) {
-      socket.write(`${target.username} is already an admin.\n`);
-
-      return true;
-    }
-
-    target.isAdmin = true;
-    notifyAdmins(clients, `${target.username} was made an admin by ${username}.`);
-
-    return true;
-  }
-
-  if (message === "/deop" || message.startsWith("/deop ")) {
-    const targetUsername = message.slice(5).trim();
-
-    if (!targetUsername) {
-      socket.write("Usage: /deop <name>\n");
-
-      return true;
-    }
-
-    const target = clients.find((client) => client.username.toLowerCase() === targetUsername.toLowerCase());
-
-    if (!target) {
-      socket.write(`User ${targetUsername} is not online.\n`);
-
-      return true;
-    }
-
-    if (target.username.toLowerCase() === "sebastian") {
-      socket.write("Sebastian cannot be removed as an admin.\n");
-
-      return true;
-    }
-
-    if (!target.isAdmin) {
-      socket.write(`${target.username} is not an admin.\n`);
-
-      return true;
-    }
-
-    const onlineAdminCount = clients.filter((client) => client.isAdmin).length;
-
-    if (onlineAdminCount <= 1) {
-      socket.write("You cannot remove the last online admin.\n");
-
-      return true;
-    }
-
-    target.isAdmin = false;
-    notifyAdmins(clients, `${target.username} was removed as an admin by ${username}.`);
 
     return true;
   }
@@ -125,7 +32,13 @@ function handleAdminCommand(socket, username, message, clients) {
   if (message.startsWith("/kick ")) {
     const targetUsername = message.slice(6).trim();
 
-    const target = clients.find((client) => client.username.toLowerCase() === targetUsername.toLowerCase());
+    if (!targetUsername) {
+      socket.write("Usage: /kick <username>\n");
+
+      return true;
+    }
+
+    const target = findTarget(clients, targetUsername);
 
     if (!target) {
       socket.write(`User ${targetUsername} is not online.\n`);
@@ -155,7 +68,13 @@ function handleAdminCommand(socket, username, message, clients) {
   if (message.startsWith("/mute ")) {
     const targetUsername = message.slice(6).trim();
 
-    const target = clients.find((client) => client.username.toLowerCase() === targetUsername.toLowerCase());
+    if (!targetUsername) {
+      socket.write("Usage: /mute <username>\n");
+
+      return true;
+    }
+
+    const target = findTarget(clients, targetUsername);
 
     if (!target) {
       socket.write(`User ${targetUsername} is not online.\n`);
@@ -181,7 +100,13 @@ function handleAdminCommand(socket, username, message, clients) {
   if (message.startsWith("/unmute ")) {
     const targetUsername = message.slice(8).trim();
 
-    const target = clients.find((client) => client.username.toLowerCase() === targetUsername.toLowerCase());
+    if (!targetUsername) {
+      socket.write("Usage: /unmute <username>\n");
+
+      return true;
+    }
+
+    const target = findTarget(clients, targetUsername);
 
     if (!target) {
       socket.write(`User ${targetUsername} is not online.\n`);
@@ -214,7 +139,7 @@ function handleAdminCommand(socket, username, message, clients) {
     return true;
   }
 
-  return false;
+  return true;
 }
 
 module.exports = {

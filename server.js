@@ -103,8 +103,11 @@ console.log("╰─────────────────────�
 console.log("");
 
 console.log("● Server online");
+
 console.log("● Port: 3000");
+
 console.log("● IP: 192.168.0.14");
+
 console.log("");
 
 console.log("Type help for server commands.");
@@ -119,43 +122,74 @@ const server = net.createServer((socket) => {
   let username = "";
   let authenticated = false;
   let disconnected = false;
+  let buffer = "";
 
   serverLog("A client connected.");
 
   socket.on("data", (data) => {
-    const message = data.toString().trim();
+    buffer += data.toString();
 
+    const lines = buffer.split("\n");
+
+    buffer = lines.pop() || "";
+
+    lines.forEach((line) => {
+      const message = line.replace(/\r$/, "");
+
+      if (!message) {
+        return;
+      }
+
+      handleClientMessage(message, socket);
+    });
+  });
+
+  function handleClientMessage(message, currentSocket) {
     if (!authenticated && message.startsWith("USERNAME:")) {
       username = message.slice(9).trim();
 
       if (!username) {
-        socket.write("AUTH_FAILED:Username is required.\n");
+        currentSocket.write("AUTH_FAILED:Username is required.\n");
+
+        return;
+      }
+
+      if (username.length > 20) {
+        currentSocket.write("AUTH_FAILED:Username is too long.\n");
+
+        return;
+      }
+
+      if (username.includes(":")) {
+        currentSocket.write("AUTH_FAILED:Invalid username.\n");
 
         return;
       }
 
       if (isUsernameTaken(clients, username)) {
-        socket.write("AUTH_FAILED:Username is already taken.\n");
+        currentSocket.write("AUTH_FAILED:Username is already taken.\n");
 
         return;
       }
 
       const userColor = getUserColor();
 
-      const user = createUser(socket, username, userColor, false);
+      const user = createUser(currentSocket, username, userColor, false);
 
       clients.push(user);
+
       authenticated = true;
 
       serverLog(`${username} joined TChat.`);
 
-      socket.write(`Welcome, ${username}!\n`);
+      currentSocket.write(`Welcome, ${username}!\n`);
 
-      sendExistingColors(socket);
+      sendExistingColors(currentSocket);
+
       sendUserColor(username, userColor);
 
       clients.forEach((client) => {
-        if (client.socket !== socket) {
+        if (client.socket !== currentSocket) {
           client.socket.write(`${username} joined TChat!\n`);
         }
       });
@@ -164,7 +198,7 @@ const server = net.createServer((socket) => {
     }
 
     if (!authenticated) {
-      socket.write("Please login with your username.\n");
+      currentSocket.write("Please login with your username.\n");
 
       return;
     }
@@ -175,29 +209,31 @@ const server = net.createServer((socket) => {
       return;
     }
 
+    // Admin login
     if (message === "/admin-login") {
       if (user.isAdmin) {
-        socket.write("You are already logged in as ADMIN.\n");
+        currentSocket.write("You are already logged in as ADMIN.\n");
 
         return;
       }
 
-      socket.write("ADMIN_PASSWORD_REQUIRED\n");
+      currentSocket.write("ADMIN_PASSWORD_REQUIRED\n");
 
       return;
     }
 
+    // Admin password
     if (message.startsWith("ADMIN_PASSWORD:")) {
       const password = message.slice(15);
 
       if (isAdmin(username, password)) {
         user.isAdmin = true;
 
-        socket.write("ADMIN_LOGIN_SUCCESS\n");
+        currentSocket.write("ADMIN_LOGIN_SUCCESS\n");
 
         serverLog(`${username} logged in as ADMIN.`);
       } else {
-        socket.write("ADMIN_LOGIN_FAILED\n");
+        currentSocket.write("ADMIN_LOGIN_FAILED\n");
 
         serverLog(`Failed admin login by ${username}.`);
       }
@@ -205,28 +241,32 @@ const server = net.createServer((socket) => {
       return;
     }
 
+    // Admin commands
     if (isAdminCommand(message)) {
-      handleAdminCommand(socket, username, message, clients);
+      handleAdminCommand(currentSocket, username, message, clients);
 
       return;
     }
 
-    if (handleCommand(socket, username, message, clients)) {
+    // Normal commands
+    if (handleCommand(currentSocket, username, message, clients)) {
       return;
     }
 
+    // Muted users
     if (user.muted) {
-      socket.write("You are muted and cannot send messages.\n");
+      currentSocket.write("You are muted and cannot send messages.\n");
 
       return;
     }
 
+    // Normal chat
     serverLog(`${username}: ${message}`);
 
     clients.forEach((client) => {
       client.socket.write(`${username}: ${message}\n`);
     });
-  });
+  }
 
   socket.on("end", () => {
     if (disconnected) {
@@ -275,7 +315,7 @@ const server = net.createServer((socket) => {
   });
 });
 
-server.listen(3000, () => {
+server.listen(3000, "0.0.0.0", () => {
   serverLog("TChat server is running.");
 });
 

@@ -34,37 +34,39 @@ function colorMessage(message, userColors) {
     return "";
   }
 
-  // Server messages
+  if (message === "CLEAR_CHAT") {
+    return "";
+  }
+
+  // Server
   if (message.startsWith("SERVER:")) {
     return `${colors.cyan}${message}${colors.reset}`;
   }
 
-  // Admin messages
+  // Admin
   if (message.startsWith("ADMIN:")) {
-    return `${colors.red}${message}${colors.reset}`;
-  }
-
-  // Admin login
-  if (message.startsWith("You are now logged in as ADMIN.") || message.startsWith("You are already logged in as ADMIN.") || message.startsWith("You are logged in as ADMIN.")) {
     return `${colors.brightRed}${message}${colors.reset}`;
   }
 
-  // Help title
+  if (message === "You are now logged in as ADMIN." || message === "You are already logged in as ADMIN." || message === "You are logged in as ADMIN.") {
+    return `${colors.brightRed}${message}${colors.reset}`;
+  }
+
+  // Help
   if (message === "TChat commands:") {
     return `${colors.brightPurple}${message}${colors.reset}`;
   }
 
-  // Admin help title
   if (message === "Admin commands:") {
     return `${colors.brightRed}${message}${colors.reset}`;
   }
 
-  // Normal help commands
+  // Normal commands shown in help
   if (message.startsWith("/users -") || message.startsWith("/help -") || message.startsWith("/quit -") || message.startsWith("/msg ") || message.startsWith("/whoami -")) {
     return `${colors.purple}${message}${colors.reset}`;
   }
 
-  // Admin help commands
+  // Admin commands shown in help
   if (message.startsWith("/clear -") || message.startsWith("/kick ") || message.startsWith("/mute ") || message.startsWith("/unmute ") || message.startsWith("/announce ")) {
     return `${colors.red}${message}${colors.reset}`;
   }
@@ -84,7 +86,7 @@ function colorMessage(message, userColors) {
   }
 
   // Errors
-  if (message.startsWith("Unknown command:") || (message.startsWith("User ") && message.includes("is not online.")) || message.includes("do not have permission") || message.includes("cannot") || message.includes("muted and cannot") || message.includes("Incorrect admin password")) {
+  if (message.startsWith("Unknown command:") || (message.startsWith("User ") && message.includes("is not online.")) || message.includes("do not have permission") || message.includes("cannot") || message.includes("muted and cannot") || message.includes("Incorrect admin password") || message.includes("Usage:")) {
     return `${colors.red}${message}${colors.reset}`;
   }
 
@@ -93,6 +95,7 @@ function colorMessage(message, userColors) {
 
   if (colonIndex !== -1) {
     const messageUsername = message.slice(0, colonIndex);
+
     const messageText = message.slice(colonIndex);
 
     const userColor = getUserColor(messageUsername, userColors);
@@ -105,5 +108,6 @@ function colorMessage(message, userColors) {
 
 module.exports = {
   colors,
+  getUserColor,
   colorMessage,
 };

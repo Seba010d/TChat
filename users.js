@@ -5,8 +5,6 @@ function createUser(socket, username, color, isAdmin) {
     color,
     isAdmin,
     muted: false,
-    isAfk: false,
-    connectedAt: Date.now(),
   };
 }
 
