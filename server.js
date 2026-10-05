@@ -1,384 +1,217 @@
-const net = require("net");
-const readline = require("readline");
+require("dotenv").config();
 
-const { createUser, findUser, removeUser, isUsernameTaken } = require("./users");
+const net = require("net");
+
+const { createUser, findUser, removeUser, isUsernameTaken, isValidUsername } = require("./users");
+
+const { getUserColor, colors } = require("./colors");
 
 const { handleCommand } = require("./commands");
 
-const { isAdmin, isAdminCommand, handleAdminCommand } = require("./admin");
-
-const { handleServerCommand } = require("./serverCommands");
+const { addUserToRoom, removeUserFromRoom } = require("./rooms");
 
 const clients = [];
+const userColors = {};
+
+const PORT = 3000;
+
+const serverInfo = {
+  version: "2.1.0",
+  port: PORT,
+  startedAt: new Date(),
+  totalMessages: 0,
+  nextMessageId: 1,
+  motd: "Welcome to TChat!",
+};
 
 const history = [];
 
-function getTime() {
-  return new Date().toLocaleTimeString("da-DK", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
-}
-
-function serverLog(message) {
-  console.log(`[${getTime()}] ${message}`);
-}
-
-function getUserColor() {
-  const hue = (clients.length * 137.5) % 360;
-
-  const saturation = 75;
-  const lightness = 60;
-
-  const c = (1 - Math.abs((2 * lightness) / 100 - 1)) * (saturation / 100);
-
-  const x = c * (1 - Math.abs(((hue / 60) % 2) - 1));
-
-  const m = lightness / 100 - c / 2;
-
-  let red = 0;
-  let green = 0;
-  let blue = 0;
-
-  if (hue < 60) {
-    red = c;
-    green = x;
-  } else if (hue < 120) {
-    red = x;
-    green = c;
-  } else if (hue < 180) {
-    green = c;
-    blue = x;
-  } else if (hue < 240) {
-    green = x;
-    blue = c;
-  } else if (hue < 300) {
-    red = x;
-    blue = c;
-  } else {
-    red = c;
-    blue = x;
-  }
-
-  return {
-    red: Math.round((red + m) * 255),
-    green: Math.round((green + m) * 255),
-    blue: Math.round((blue + m) * 255),
-  };
-}
-
-function sendUserColor(username, color) {
-  clients.forEach((client) => {
-    client.socket.write(`USER_COLOR:${username}:${color.red},${color.green},${color.blue}\n`);
-  });
-}
-
-function sendExistingColors(socket) {
-  clients.forEach((client) => {
-    socket.write(`USER_COLOR:${client.username}:${client.color.red},${client.color.green},${client.color.blue}\n`);
-  });
-}
-
-function sendHistory(socket) {
-  if (history.length === 0) {
-    return;
-  }
-
-  history.forEach((message) => {
-    socket.write(`HISTORY:${message}\n`);
-  });
-}
-
-function addToHistory(message) {
-  history.push(message);
-
-  if (history.length > 100) {
-    history.shift();
-  }
-}
-
-function removeDisconnectedUser(socket) {
-  const user = removeUser(clients, socket);
-
-  if (!user) {
-    return;
-  }
-
-  serverLog(`${user.username} left TChat.`);
-
-  const leaveMessage = `${user.username} left TChat!`;
-
-  clients.forEach((client) => {
-    client.socket.write(`${leaveMessage}\n`);
-  });
-}
-
-console.clear();
-
-console.log("╭────────────────────────────────────────╮");
-
-console.log("│              TCHAT SERVER              │");
-
-console.log("╰────────────────────────────────────────╯");
-
-console.log("");
-
-console.log("● Server online");
-
-console.log("● Port: 3000");
-
-console.log("● IP: 192.168.0.14");
-
-console.log("");
-
-console.log("Type help for server commands.");
-
-console.log("");
-
-console.log("──────────────────────────────────────────");
-
-console.log("");
-
 const server = net.createServer((socket) => {
   let username = "";
-  let authenticated = false;
-  let disconnected = false;
   let buffer = "";
+  let loggedIn = false;
 
-  serverLog("A client connected.");
+  socket.setEncoding("utf8");
+
+  socket.write("USERNAME:\n");
 
   socket.on("data", (data) => {
-    buffer += data.toString();
+    buffer += data;
 
     const lines = buffer.split("\n");
 
     buffer = lines.pop() || "";
 
     lines.forEach((line) => {
-      const message = line.replace(/\r$/, "");
+      const message = line.trim();
 
       if (!message) {
         return;
       }
 
-      handleClientMessage(message, socket);
+      if (!loggedIn) {
+        if (!isValidUsername(message)) {
+          socket.write("ERROR: Invalid username.\n");
+
+          return;
+        }
+
+        if (message.length < 2 || message.length > 20) {
+          socket.write("ERROR: Username must be 2-20 characters.\n");
+
+          return;
+        }
+
+        if (isUsernameTaken(clients, message)) {
+          socket.write("ERROR: Username already taken.\n");
+
+          return;
+        }
+
+        username = message;
+
+        const isAdmin = username === process.env.TCHAT_ADMIN_USERNAME;
+
+        const color = getUserColor(username, userColors);
+
+        userColors[username] = color;
+
+        const user = createUser(socket, username, color, isAdmin);
+
+        clients.push(user);
+
+        addUserToRoom(username, "general");
+
+        loggedIn = true;
+
+        socket.write(`WELCOME:${username}\n`);
+
+        socket.write(`SERVER:${serverInfo.motd}\n`);
+
+        socket.write(`USER_COLOR:${username}:${color}\n`);
+
+        clients.forEach((client) => {
+          if (client.socket !== socket) {
+            socket.write(`USER_COLOR:${client.username}:${client.color}\n`);
+          }
+        });
+
+        history.slice(-20).forEach((item) => {
+          socket.write(`HISTORY:${item}\n`);
+        });
+
+        clients.forEach((client) => {
+          if (client.socket !== socket && !client.socket.destroyed) {
+            client.socket.write(`SERVER: ${username} joined the chat\n`);
+          }
+        });
+
+        return;
+      }
+
+      const user = findUser(clients, username);
+
+      if (!user) {
+        return;
+      }
+
+      if (message.startsWith("/")) {
+        handleCommand(socket, username, message, clients, history, serverInfo);
+
+        username = user.username;
+
+        return;
+      }
+
+      if (user.muted) {
+        socket.write("ERROR: You are muted.\n");
+
+        return;
+      }
+
+      if (message.length > 500) {
+        socket.write("ERROR: Message is too long.\n");
+
+        return;
+      }
+
+      const now = Date.now();
+
+      if (now - user.lastMessageTime < 500) {
+        socket.write("ERROR: Slow down.\n");
+
+        return;
+      }
+
+      user.lastMessageTime = now;
+
+      if (user.isAfk) {
+        user.isAfk = false;
+        user.afkMessage = "";
+        user.status = "Online";
+
+        broadcastRoomBack(clients, user.room, `SERVER: ${user.username} is back`);
+      }
+
+      user.messageCount++;
+
+      const id = serverInfo.nextMessageId++;
+
+      const time = new Date().toLocaleTimeString();
+
+      const roomName = user.room || "general";
+
+      const formattedMessage = `[${time}] #${id} ${user.username}: ${message}`;
+
+      user.lastMessage = formattedMessage;
+
+      user.lastMessageId = id;
+
+      serverInfo.totalMessages++;
+
+      history.push(formattedMessage);
+
+      if (history.length > 100) {
+        history.shift();
+      }
+
+      clients.forEach((client) => {
+        if (client.room === roomName && !client.socket.destroyed) {
+          client.socket.write(formattedMessage + "\n");
+        }
+      });
     });
   });
 
-  function handleClientMessage(message, currentSocket) {
-    if (!authenticated && message.startsWith("USERNAME:")) {
-      username = message.slice(9).trim();
-
-      if (!username) {
-        currentSocket.write("AUTH_FAILED:Username is required.\n");
-
-        return;
-      }
-
-      if (username.length > 20) {
-        currentSocket.write("AUTH_FAILED:Username is too long.\n");
-
-        return;
-      }
-
-      if (username.includes(":")) {
-        currentSocket.write("AUTH_FAILED:Invalid username.\n");
-
-        return;
-      }
-
-      if (isUsernameTaken(clients, username)) {
-        currentSocket.write("AUTH_FAILED:Username is already taken.\n");
-
-        return;
-      }
-
-      const userColor = getUserColor();
-
-      const user = createUser(currentSocket, username, userColor, false);
-
-      clients.push(user);
-
-      authenticated = true;
-
-      serverLog(`${username} joined TChat.`);
-
-      currentSocket.write(`Welcome, ${username}!\n`);
-
-      sendExistingColors(currentSocket);
-
-      sendHistory(currentSocket);
-
-      sendUserColor(username, userColor);
-
-      clients.forEach((client) => {
-        if (client.socket !== currentSocket) {
-          client.socket.write(`${username} joined TChat!\n`);
-        }
-      });
-
-      return;
-    }
-
-    if (!authenticated) {
-      currentSocket.write("Please login with your username.\n");
-
-      return;
-    }
-
-    const user = findUser(clients, username);
+  socket.on("close", () => {
+    const user = removeUser(clients, socket);
 
     if (!user) {
       return;
     }
 
-    if (message === "/admin-login") {
-      if (user.isAdmin) {
-        currentSocket.write("You are already logged in as ADMIN.\n");
-
-        return;
-      }
-
-      currentSocket.write("ADMIN_PASSWORD_REQUIRED\n");
-
-      return;
-    }
-
-    if (message.startsWith("ADMIN_PASSWORD:")) {
-      const password = message.slice(15);
-
-      if (isAdmin(username, password)) {
-        user.isAdmin = true;
-
-        currentSocket.write("ADMIN_LOGIN_SUCCESS\n");
-
-        serverLog(`${username} logged in as ADMIN.`);
-      } else {
-        currentSocket.write("ADMIN_LOGIN_FAILED\n");
-
-        serverLog(`Failed admin login by ${username}.`);
-      }
-
-      return;
-    }
-
-    if (isAdminCommand(message)) {
-      handleAdminCommand(currentSocket, username, message, clients);
-
-      return;
-    }
-
-    if (handleCommand(currentSocket, username, message, clients, history)) {
-      return;
-    }
-
-    if (user.muted) {
-      currentSocket.write("You are muted and cannot send messages.\n");
-
-      return;
-    }
-
-    if (message.length > 500) {
-      currentSocket.write("Message cannot be longer than 500 characters.\n");
-
-      return;
-    }
-
-    const formattedMessage = `[${getTime()}] ${username}: ${message}`;
-
-    addToHistory(formattedMessage);
-
-    user.lastMessage = message;
-
-    serverLog(`${username}: ${message}`);
+    removeUserFromRoom(user.username, user.room || "general");
 
     clients.forEach((client) => {
-      let output = formattedMessage;
-
-      const mentionRegex = /@([A-Za-z0-9_-]+)/g;
-
-      const mentions = message.match(mentionRegex);
-
-      if (mentions && mentions.some((mention) => mention.slice(1).toLowerCase() === client.username.toLowerCase())) {
-        output = `MENTION:${formattedMessage}`;
+      if (!client.socket.destroyed) {
+        client.socket.write(`SERVER: ${user.username} left the chat\n`);
       }
-
-      client.socket.write(`${output}\n`);
     });
-  }
-
-  socket.on("end", () => {
-    if (disconnected) {
-      return;
-    }
-
-    disconnected = true;
-
-    if (!authenticated) {
-      return;
-    }
-
-    removeDisconnectedUser(socket);
   });
 
-  socket.on("close", () => {
-    if (disconnected) {
-      return;
+  socket.on("error", () => {});
+});
+
+function broadcastRoomBack(clients, roomName, message) {
+  clients.forEach((client) => {
+    if (client.room === roomName && !client.socket.destroyed) {
+      client.socket.write(message + "\n");
     }
-
-    disconnected = true;
-
-    if (!authenticated) {
-      return;
-    }
-
-    removeDisconnectedUser(socket);
   });
+}
 
-  socket.on("error", (error) => {
-    if (error.code === "ECONNRESET") {
-      if (disconnected) {
-        return;
-      }
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`${colors.brightCyan}TChat server running on port ${PORT}${colors.reset}`);
 
-      disconnected = true;
-
-      if (authenticated) {
-        removeDisconnectedUser(socket);
-      }
-
-      return;
-    }
-
-    serverLog(`Socket error: ${error.message}`);
-  });
-});
-
-server.listen(3000, "0.0.0.0", () => {
-  serverLog("TChat server is running.");
-});
-
-const serverInput = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout,
-  prompt: "> ",
-});
-
-serverInput.prompt();
-
-serverInput.on("line", (input) => {
-  const command = input.trim();
-
-  if (!command) {
-    serverInput.prompt();
-
-    return;
-  }
-
-  handleServerCommand(command, clients, server);
-
-  if (command.toLowerCase() !== "stop") {
-    serverInput.prompt();
-  }
+  console.log(`${colors.gray}Waiting for clients...${colors.reset}`);
 });

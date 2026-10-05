@@ -1,362 +1,419 @@
-function getTime() {
-  return new Date().toLocaleTimeString("da-DK", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
+const { findUser, isUsernameTaken, isValidUsername } = require("./users");
+
+const { getRooms, createRoom, addUserToRoom, removeUserFromRoom, getUsersInRoom } = require("./rooms");
+
+function send(socket, message) {
+  socket.write(message + "\n");
+}
+
+function broadcast(clients, message) {
+  clients.forEach((client) => {
+    if (client.socket && !client.socket.destroyed) {
+      client.socket.write(message + "\n");
+    }
   });
 }
 
-function formatMessage(username, message) {
-  return `[${getTime()}] ${username}: ${message}`;
+function broadcastRoom(clients, roomName, message) {
+  clients.forEach((client) => {
+    if (client.room === roomName && client.socket && !client.socket.destroyed) {
+      client.socket.write(message + "\n");
+    }
+  });
 }
 
-function handleCommand(socket, username, message, clients, history) {
-  if (message === "/users" || message === "/online") {
-    socket.write("Online users:\n");
+function handleCommand(socket, username, message, clients, history, serverInfo) {
+  const parts = message.trim().split(" ");
 
-    clients.forEach((client) => {
-      let status = "";
+  const command = parts[0].toLowerCase();
 
-      if (client.isAdmin) {
-        status += " [ADMIN]";
-      }
+  const args = parts.slice(1);
 
-      if (client.muted) {
-        status += " [MUTED]";
-      }
+  const user = findUser(clients, username);
 
-      socket.write(`- ${client.username} - ${client.status}${status}\n`);
+  if (!user) {
+    return;
+  }
+
+  if (command === "/users" || command === "/online") {
+    const users = clients.map((client) => client.username).join(", ");
+
+    send(socket, `SERVER: Online users: ${users}`);
+
+    return;
+  }
+
+  if (command === "/rooms") {
+    const rooms = getRooms();
+
+    send(socket, "SERVER: Available rooms:");
+
+    rooms.forEach((room) => {
+      send(socket, `SERVER: #${room.name} (${room.users.size} users)`);
     });
 
-    return true;
+    return;
   }
 
-  if (message === "/help") {
-    socket.write("TChat commands:\n");
+  if (command === "/room") {
+    send(socket, `SERVER: You are currently in #${user.room}`);
 
-    socket.write("/users - Show online users\n");
-
-    socket.write("/online - Show online users\n");
-
-    socket.write("/help - Show available commands\n");
-
-    socket.write("/quit - Leave TChat\n");
-
-    socket.write("/msg <username> <message> - Send a private message\n");
-
-    socket.write("/whoami - Show your username\n");
-
-    socket.write("/me <message> - Perform an action\n");
-
-    socket.write("/reply <message> - Reply to your last private message\n");
-
-    socket.write("/last <number> - Show previous messages\n");
-
-    socket.write("/profile <username> - Show a user's profile\n");
-
-    socket.write("/userinfo <username> - Show detailed user information\n");
-
-    socket.write("/status <message> - Set your status\n");
-
-    socket.write("/status clear - Clear your status\n");
-
-    const user = clients.find((client) => client.socket === socket);
-
-    if (user && user.isAdmin) {
-      socket.write("\nAdmin commands:\n");
-
-      socket.write("/clear - Clear the chat for everyone\n");
-
-      socket.write("/kick <username> - Kick a user\n");
-
-      socket.write("/mute <username> - Mute a user\n");
-
-      socket.write("/unmute <username> - Unmute a user\n");
-
-      socket.write("/announce <message> - Send an admin announcement\n");
-    }
-
-    return true;
+    return;
   }
 
-  if (message === "/whoami") {
-    const user = clients.find((client) => client.socket === socket);
+  if (command === "/join") {
+    if (!args[0]) {
+      send(socket, "ERROR: Usage: /join <room>");
 
-    if (!user) {
-      return true;
+      return;
     }
 
-    if (user.isAdmin) {
-      socket.write(`You are ${username} (ADMIN).\n`);
-    } else {
-      socket.write(`You are ${username}.\n`);
+    const roomName = args[0].toLowerCase().replace(/[^a-z0-9_-]/g, "");
+
+    if (!roomName) {
+      send(socket, "ERROR: Invalid room name.");
+
+      return;
     }
 
-    return true;
+    if (roomName.length > 20) {
+      send(socket, "ERROR: Room name is too long.");
+
+      return;
+    }
+
+    const oldRoom = user.room || "general";
+
+    if (oldRoom === roomName) {
+      send(socket, `SERVER: You are already in #${roomName}`);
+
+      return;
+    }
+
+    removeUserFromRoom(username, oldRoom);
+
+    user.room = roomName;
+
+    createRoom(roomName);
+
+    addUserToRoom(username, roomName);
+
+    broadcastRoom(clients, oldRoom, `SERVER: ${username} left #${oldRoom}`);
+
+    broadcastRoom(clients, roomName, `SERVER: ${username} joined #${roomName}`);
+
+    send(socket, `SERVER: You joined #${roomName}`);
+
+    return;
   }
 
-  if (message === "/admin") {
-    const user = clients.find((client) => client.socket === socket);
+  if (command === "/leave") {
+    const currentRoom = user.room || "general";
 
-    if (user && user.isAdmin) {
-      socket.write("You are an admin.\n");
-    } else {
-      socket.write("You are not an admin.\n");
+    if (currentRoom === "general") {
+      send(socket, "SERVER: You are already in #general");
+
+      return;
     }
 
-    return true;
+    removeUserFromRoom(username, currentRoom);
+
+    user.room = "general";
+
+    addUserToRoom(username, "general");
+
+    broadcastRoom(clients, currentRoom, `SERVER: ${username} left #${currentRoom}`);
+
+    broadcastRoom(clients, "general", `SERVER: ${username} joined #general`);
+
+    send(socket, "SERVER: You joined #general");
+
+    return;
   }
 
-  if (message === "/quit") {
-    socket.end();
+  if (command === "/who") {
+    const roomName = user.room || "general";
 
-    return true;
+    const users = getUsersInRoom(roomName);
+
+    send(socket, `SERVER: Users in #${roomName}: ${users.join(", ")}`);
+
+    return;
   }
 
-  if (message.startsWith("/msg ")) {
-    const parts = message.split(" ");
+  if (command === "/nick") {
+    if (!args[0]) {
+      send(socket, "ERROR: Usage: /nick <name>");
 
-    const targetUsername = parts[1];
-
-    const privateMessage = parts.slice(2).join(" ").trim();
-
-    if (!targetUsername || !privateMessage) {
-      socket.write("Usage: /msg <username> <message>\n");
-
-      return true;
+      return;
     }
 
-    const target = clients.find((client) => client.username.toLowerCase() === targetUsername.toLowerCase());
+    const newUsername = args[0];
 
-    if (!target) {
-      socket.write(`User ${targetUsername} is not online.\n`);
+    if (!isValidUsername(newUsername)) {
+      send(socket, "ERROR: Username can only contain letters, numbers, _ and -.");
 
-      return true;
+      return;
     }
 
-    const fromUser = clients.find((client) => client.socket === socket);
+    if (newUsername.length < 2 || newUsername.length > 20) {
+      send(socket, "ERROR: Username must be 2-20 characters.");
 
-    if (fromUser) {
-      fromUser.lastMessage = {
-        type: "private",
-        target: target.username,
-        message: privateMessage,
-      };
+      return;
     }
 
-    target.lastPrivateMessage = {
-      username,
-      message: privateMessage,
-      socket,
-    };
+    if (isUsernameTaken(clients, newUsername)) {
+      send(socket, "ERROR: Username already taken.");
 
-    socket.write(`Private message to ${target.username}: ${privateMessage}\n`);
+      return;
+    }
 
-    target.socket.write(`Private message from ${username}: ${privateMessage}\n`);
+    const oldUsername = user.username;
 
-    return true;
+    const roomName = user.room || "general";
+
+    user.username = newUsername;
+
+    removeUserFromRoom(oldUsername, roomName);
+
+    addUserToRoom(newUsername, roomName);
+
+    send(socket, `SERVER: Your username is now ${newUsername}`);
+
+    broadcastRoom(clients, roomName, `SERVER: ${oldUsername} is now known as ${newUsername}`);
+
+    return;
   }
 
-  if (message.startsWith("/reply ")) {
-    const replyMessage = message.slice(7).trim();
-
-    if (!replyMessage) {
-      socket.write("Usage: /reply <message>\n");
-
-      return true;
-    }
-
-    const user = clients.find((client) => client.socket === socket);
-
-    if (!user || !user.lastPrivateMessage) {
-      socket.write("You have nobody to reply to.\n");
-
-      return true;
-    }
-
-    const target = user.lastPrivateMessage;
-
-    const targetUser = clients.find((client) => client.socket === target.socket);
-
-    if (!targetUser) {
-      socket.write(`User ${target.username} is not online.\n`);
-
-      return true;
-    }
-
-    targetUser.lastPrivateMessage = {
-      username,
-      message: replyMessage,
-      socket,
-    };
-
-    socket.write(`Private message to ${targetUser.username}: ${replyMessage}\n`);
-
-    targetUser.socket.write(`Private message from ${username}: ${replyMessage}\n`);
-
-    return true;
-  }
-
-  if (message.startsWith("/last")) {
-    const parts = message.split(" ");
-
-    let amount = 10;
-
-    if (parts[1]) {
-      amount = Number(parts[1]);
-    }
-
-    if (Number.isNaN(amount) || amount < 1) {
-      socket.write("Usage: /last <number>\n");
-
-      return true;
-    }
-
-    amount = Math.min(amount, 50);
-
-    const start = Math.max(0, history.length - amount);
-
-    socket.write(`Last ${Math.min(amount, history.length)} messages:\n`);
-
-    history.slice(start).forEach((historyMessage) => {
-      socket.write(`${historyMessage}\n`);
-    });
-
-    return true;
-  }
-
-  if (message.startsWith("/me ")) {
-    const action = message.slice(4).trim();
+  if (command === "/me") {
+    const action = args.join(" ");
 
     if (!action) {
-      socket.write("Usage: /me <message>\n");
+      send(socket, "ERROR: Usage: /me <action>");
 
-      return true;
+      return;
     }
 
-    const formatted = `[${getTime()}] ME: ${username} ${action}`;
+    const id = serverInfo.nextMessageId++;
 
-    history.push(formatted);
+    const time = new Date().toLocaleTimeString();
+
+    const roomName = user.room || "general";
+
+    const formattedMessage = `[${time}] #${id} * ${user.username} ${action}`;
+
+    history.push(formattedMessage);
 
     if (history.length > 100) {
       history.shift();
     }
 
-    clients.forEach((client) => {
-      client.socket.write(`${formatted}\n`);
-    });
+    serverInfo.totalMessages++;
 
-    return true;
+    broadcastRoom(clients, roomName, formattedMessage);
+
+    return;
   }
 
-  if (message.startsWith("/profile ")) {
-    const targetUsername = message.slice(9).trim();
+  if (command === "/afk") {
+    const afkMessage = args.join(" ") || "AFK";
 
-    if (!targetUsername) {
-      socket.write("Usage: /profile <username>\n");
+    user.isAfk = true;
+    user.afkMessage = afkMessage;
+    user.status = "AFK";
 
-      return true;
+    broadcastRoom(clients, user.room, `SERVER: ${user.username} is now AFK: ${afkMessage}`);
+
+    return;
+  }
+
+  if (command === "/back") {
+    user.isAfk = false;
+    user.afkMessage = "";
+    user.status = "Online";
+
+    broadcastRoom(clients, user.room, `SERVER: ${user.username} is back`);
+
+    return;
+  }
+
+  if (command === "/profile") {
+    send(socket, `PROFILE: Username: ${user.username}`);
+
+    send(socket, `PROFILE: Status: ${user.status}`);
+
+    send(socket, `PROFILE: Room: #${user.room}`);
+
+    send(socket, `PROFILE: Messages: ${user.messageCount}`);
+
+    send(socket, `PROFILE: Joined: ${user.joinedAt.toLocaleString()}`);
+
+    return;
+  }
+
+  if (command === "/stats") {
+    send(socket, `SERVER: Your messages: ${user.messageCount}`);
+
+    send(socket, `SERVER: Total server messages: ${serverInfo.totalMessages}`);
+
+    return;
+  }
+
+  if (command === "/time") {
+    send(socket, `SERVER: ${new Date().toLocaleString()}`);
+
+    return;
+  }
+
+  if (command === "/ping") {
+    send(socket, `PONG:${Date.now()}`);
+
+    return;
+  }
+
+  if (command === "/serverinfo") {
+    send(socket, `SERVER: TChat ${serverInfo.version}`);
+
+    send(socket, `SERVER: Users online: ${clients.length}`);
+
+    send(socket, `SERVER: Messages: ${serverInfo.totalMessages}`);
+
+    return;
+  }
+
+  if (command === "/motd") {
+    send(socket, `SERVER: ${serverInfo.motd}`);
+
+    return;
+  }
+
+  if (command === "/msg" || command === "/dm") {
+    if (args.length < 2) {
+      send(socket, "ERROR: Usage: /msg <user> <message>");
+
+      return;
     }
 
-    const target = clients.find((client) => client.username.toLowerCase() === targetUsername.toLowerCase());
+    const target = findUser(clients, args[0]);
 
     if (!target) {
-      socket.write(`User ${targetUsername} not found.\n`);
+      send(socket, `ERROR: User "${args[0]}" not found.`);
 
-      return true;
+      return;
     }
 
-    socket.write(`PROFILE:Profile: ${target.username}\n`);
+    const privateMessage = args.slice(1).join(" ");
 
-    socket.write(`PROFILE:Status: ${target.status}\n`);
+    target.lastPrivateMessage = {
+      username: user.username,
+      socket,
+    };
 
-    socket.write(`PROFILE:Role: ${target.isAdmin ? "ADMIN" : "User"}\n`);
+    user.lastPrivateMessage = {
+      username: target.username,
+      socket: target.socket,
+    };
 
-    socket.write(`PROFILE:Muted: ${target.muted ? "Yes" : "No"}\n`);
+    send(target.socket, `PRIVATE:${user.username} -> you: ${privateMessage}`);
 
-    return true;
+    send(socket, `PRIVATE:you -> ${target.username}: ${privateMessage}`);
+
+    return;
   }
 
-  if (message.startsWith("/userinfo ")) {
-    const targetUsername = message.slice(10).trim();
+  if (command === "/last") {
+    const last = history.slice(-10);
 
-    if (!targetUsername) {
-      socket.write("Usage: /userinfo <username>\n");
+    if (!last.length) {
+      send(socket, "SERVER: No messages yet.");
 
-      return true;
+      return;
     }
 
-    const target = clients.find((client) => client.username.toLowerCase() === targetUsername.toLowerCase());
+    last.forEach((item) => send(socket, `HISTORY:${item}`));
 
-    if (!target) {
-      socket.write(`User ${targetUsername} not found.\n`);
-
-      return true;
-    }
-
-    const joined = target.joinedAt.toLocaleString("da-DK");
-
-    socket.write(`PROFILE:Username: ${target.username}\n`);
-
-    socket.write(`PROFILE:Status: ${target.status}\n`);
-
-    socket.write(`PROFILE:Role: ${target.isAdmin ? "ADMIN" : "User"}\n`);
-
-    socket.write(`PROFILE:Muted: ${target.muted ? "Yes" : "No"}\n`);
-
-    socket.write(`PROFILE:Joined: ${joined}\n`);
-
-    return true;
+    return;
   }
 
-  if (message.startsWith("/status")) {
-    const user = clients.find((client) => client.socket === socket);
+  if (command === "/search") {
+    const search = args.join(" ").toLowerCase();
 
-    if (!user) {
-      return true;
+    if (!search) {
+      send(socket, "ERROR: Usage: /search <text>");
+
+      return;
     }
 
-    const status = message.slice(7).trim();
+    const results = history.filter((item) => item.toLowerCase().includes(search));
 
-    if (status.toLowerCase() === "clear") {
-      user.status = "Online";
+    if (!results.length) {
+      send(socket, "SERVER: No results found.");
 
-      socket.write("Your status has been cleared.\n");
-
-      return true;
+      return;
     }
 
-    if (!status) {
-      socket.write(`Your current status: ${user.status}\n`);
+    results.slice(-20).forEach((item) => send(socket, `HISTORY:${item}`));
 
-      return true;
-    }
-
-    if (status.length > 50) {
-      socket.write("Status cannot be longer than 50 characters.\n");
-
-      return true;
-    }
-
-    user.status = status;
-
-    clients.forEach((client) => {
-      client.socket.write(`${username}'s status is now: ${status}\n`);
-    });
-
-    return true;
+    return;
   }
 
-  if (message.startsWith("/")) {
-    socket.write(`Unknown command: ${message}\n`);
+  if (command === "/help") {
+    send(socket, "HELP: Chat commands");
 
-    return true;
+    send(socket, "HELP: /users - Show online users");
+
+    send(socket, "HELP: /rooms - Show rooms");
+
+    send(socket, "HELP: /join <room> - Join a room");
+
+    send(socket, "HELP: /leave - Leave current room");
+
+    send(socket, "HELP: /room - Show current room");
+
+    send(socket, "HELP: /who - Show users in room");
+
+    send(socket, "HELP: /nick <name> - Change username");
+
+    send(socket, "HELP: /me <action> - Send an action");
+
+    send(socket, "HELP: /afk [message] - Set AFK");
+
+    send(socket, "HELP: /back - Remove AFK");
+
+    send(socket, "HELP: /profile - Show profile");
+
+    send(socket, "HELP: /stats - Show statistics");
+
+    send(socket, "HELP: /msg <user> <message> - Private message");
+
+    send(socket, "HELP: /last - Show last messages");
+
+    send(socket, "HELP: /search <text> - Search messages");
+
+    send(socket, "HELP: /ping - Check ping");
+
+    send(socket, "HELP: /serverinfo - Server information");
+
+    send(socket, "HELP: /motd - Server message");
+
+    send(socket, "HELP: /quit - Disconnect");
+
+    return;
   }
 
-  return false;
+  if (command === "/quit") {
+    send(socket, "SERVER: Goodbye!");
+
+    socket.end();
+
+    return;
+  }
+
+  if (command.startsWith("/")) {
+    send(socket, `ERROR: Unknown command "${command}"`);
+  }
 }
 
 module.exports = {
   handleCommand,
-  formatMessage,
 };
