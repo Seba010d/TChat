@@ -2,6 +2,8 @@ const { findUser, isUsernameTaken, isValidUsername } = require("./users");
 
 const { getRooms, createRoom, addUserToRoom, removeUserFromRoom, getUsersInRoom } = require("./rooms");
 
+const { isAdminCommand, handleAdminCommand } = require("./admin");
+
 function send(socket, message) {
   socket.write(message + "\n");
 }
@@ -32,6 +34,12 @@ function handleCommand(socket, username, message, clients, history, serverInfo) 
   const user = findUser(clients, username);
 
   if (!user) {
+    return;
+  }
+
+  if (isAdminCommand(message)) {
+    handleAdminCommand(socket, username, message, clients);
+
     return;
   }
 
@@ -395,6 +403,10 @@ function handleCommand(socket, username, message, clients, history, serverInfo) 
     send(socket, "HELP: /serverinfo - Server information");
 
     send(socket, "HELP: /motd - Server message");
+
+    send(socket, "HELP: /admin-login - Log in as admin");
+
+    send(socket, "HELP: Admin: /clear /kick /mute /unmute /announce");
 
     send(socket, "HELP: /quit - Disconnect");
 

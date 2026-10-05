@@ -7,6 +7,7 @@ const { createUser, findUser, removeUser, isUsernameTaken, isValidUsername } = r
 const { getUserColor, colors } = require("./colors");
 
 const { handleCommand } = require("./commands");
+const { isAdmin } = require("./admin");
 
 const { addUserToRoom, removeUserFromRoom } = require("./rooms");
 
@@ -72,13 +73,11 @@ const server = net.createServer((socket) => {
 
         username = message;
 
-        const isAdmin = username === process.env.TCHAT_ADMIN_USERNAME;
-
         const color = getUserColor(username, userColors);
 
         userColors[username] = color;
 
-        const user = createUser(socket, username, color, isAdmin);
+        const user = createUser(socket, username, color, false);
 
         clients.push(user);
 
@@ -110,6 +109,36 @@ const server = net.createServer((socket) => {
       const user = findUser(clients, username);
 
       if (!user) {
+        return;
+      }
+
+      if (user.pendingAdminLogin) {
+        if (!message.startsWith("ADMIN_PASSWORD_RESPONSE:")) {
+          socket.write("ERROR: Finish the admin login first.\n");
+
+          return;
+        }
+
+        const password = message.substring("ADMIN_PASSWORD_RESPONSE:".length);
+
+        user.pendingAdminLogin = false;
+
+        if (isAdmin(user.username, password)) {
+          user.isAdmin = true;
+
+          socket.write("ADMIN_LOGIN_SUCCESS\n");
+        } else {
+          socket.write("ADMIN_LOGIN_FAILED\n");
+        }
+
+        return;
+      }
+
+      if (message === "/admin-login") {
+        user.pendingAdminLogin = true;
+
+        socket.write("ADMIN_PASSWORD:\n");
+
         return;
       }
 

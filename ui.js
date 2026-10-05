@@ -1,6 +1,6 @@
 const { colorMessage, colors } = require("./colors");
 
-function draw(messages, input, username, userColors, waitingForUsername = false) {
+function draw(messages, input, username, userColors, waitingForUsername = false, waitingForAdminPassword = false) {
   const columns = process.stdout.columns || 80;
 
   const rows = process.stdout.rows || 24;
@@ -37,6 +37,24 @@ function draw(messages, input, username, userColors, waitingForUsername = false)
     console.log(`${colors.gray}${"─".repeat(width)}${colors.reset}`);
 
     process.stdout.write(`${colors.brightGreen}> ${colors.reset}${input}`);
+
+    return;
+  }
+
+  if (waitingForAdminPassword) {
+    console.log(`${colors.brightCyan}Enter admin password:${colors.reset}`);
+
+    console.log("");
+
+    console.log(`${colors.gray}${" ".repeat(2)}Password: ${colors.reset}${"*".repeat(input.length)}`);
+
+    console.log("");
+
+    console.log("");
+
+    console.log(`${colors.gray}${"─".repeat(width)}${colors.reset}`);
+
+    process.stdout.write(`${colors.brightGreen}> ${colors.reset}${"*".repeat(input.length)}`);
 
     return;
   }

@@ -4,6 +4,7 @@ function createUser(socket, username, color, isAdmin) {
     username,
     color,
     isAdmin,
+    pendingAdminLogin: false,
     muted: false,
     status: "Online",
     lastMessage: null,

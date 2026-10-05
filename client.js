@@ -15,10 +15,11 @@ let messages = [];
 let userColors = {};
 let loggedIn = false;
 let waitingForUsername = false;
+let waitingForAdminPassword = false;
 let buffer = "";
 
 function render() {
-  draw(messages, input, username, userColors, waitingForUsername);
+  draw(messages, input, username, userColors, waitingForUsername, waitingForAdminPassword);
 }
 
 function addMessage(message) {
@@ -51,6 +52,36 @@ socket.on("data", (data) => {
       return;
     }
 
+    if (message === "ADMIN_PASSWORD:") {
+      waitingForAdminPassword = true;
+
+      input = "";
+
+      render();
+
+      return;
+    }
+
+    if (message === "ADMIN_LOGIN_SUCCESS") {
+      waitingForAdminPassword = false;
+
+      input = "";
+
+      addMessage("SERVER: Admin login successful.");
+
+      return;
+    }
+
+    if (message === "ADMIN_LOGIN_FAILED") {
+      waitingForAdminPassword = false;
+
+      input = "";
+
+      addMessage("SERVER: Admin login failed.");
+
+      return;
+    }
+
     if (message === "USERNAME:") {
       waitingForUsername = true;
 
@@ -63,6 +94,7 @@ socket.on("data", (data) => {
 
     if (message.startsWith("WELCOME:")) {
       loggedIn = true;
+
       waitingForUsername = false;
 
       username = message.substring(8);
@@ -143,6 +175,16 @@ process.stdin.on("data", (key) => {
     const text = input.trim();
 
     if (!text) {
+      return;
+    }
+
+    if (waitingForAdminPassword) {
+      socket.write(`ADMIN_PASSWORD_RESPONSE:${text}\n`);
+
+      input = "";
+
+      render();
+
       return;
     }
 
