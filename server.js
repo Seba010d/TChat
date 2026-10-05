@@ -78,6 +78,20 @@ function sendExistingColors(socket) {
   });
 }
 
+function removeDisconnectedUser(socket) {
+  const user = removeUser(clients, socket);
+
+  if (!user) {
+    return;
+  }
+
+  serverLog(`${user.username} left TChat.`);
+
+  clients.forEach((client) => {
+    client.socket.write(`${user.username} left TChat!\n`);
+  });
+}
+
 console.clear();
 
 console.log("╭────────────────────────────────────────╮");
@@ -104,6 +118,7 @@ console.log("");
 const server = net.createServer((socket) => {
   let username = "";
   let authenticated = false;
+  let disconnected = false;
 
   serverLog("A client connected.");
 
@@ -214,27 +229,49 @@ const server = net.createServer((socket) => {
   });
 
   socket.on("end", () => {
+    if (disconnected) {
+      return;
+    }
+
+    disconnected = true;
+
     if (!authenticated) {
       return;
     }
 
-    const user = removeUser(clients, socket);
+    removeDisconnectedUser(socket);
+  });
 
-    if (!user) {
+  socket.on("close", () => {
+    if (disconnected) {
       return;
     }
 
-    serverLog(`${user.username} left TChat.`);
+    disconnected = true;
 
-    clients.forEach((client) => {
-      client.socket.write(`${user.username} left TChat!\n`);
-    });
+    if (!authenticated) {
+      return;
+    }
+
+    removeDisconnectedUser(socket);
   });
 
   socket.on("error", (error) => {
-    if (error.code !== "ECONNRESET") {
-      serverLog(`Socket error: ${error.message}`);
+    if (error.code === "ECONNRESET") {
+      if (disconnected) {
+        return;
+      }
+
+      disconnected = true;
+
+      if (authenticated) {
+        removeDisconnectedUser(socket);
+      }
+
+      return;
     }
+
+    serverLog(`Socket error: ${error.message}`);
   });
 });
 
