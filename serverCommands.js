@@ -1,20 +1,24 @@
 function handleServerCommand(command, clients, server) {
-  if (command === "/help") {
+  const parts = command.trim().split(" ");
+  const commandName = parts[0].toLowerCase();
+
+  if (commandName === "help") {
     console.log("");
     console.log("Server commands:");
-    console.log("/users - Show online users");
-    console.log("/say <message> - Send a message to everyone");
-    console.log("/kick <username> - Kick a user");
-    console.log("/mute <username> - Mute a user");
-    console.log("/unmute <username> - Unmute a user");
-    console.log("/clear - Clear the chat for everyone");
-    console.log("/stop - Stop the server");
+    console.log("help - Show server commands");
+    console.log("users - Show online users");
+    console.log("say <message> - Send a message to everyone");
+    console.log("kick <username> - Kick a user");
+    console.log("mute <username> - Mute a user");
+    console.log("unmute <username> - Unmute a user");
+    console.log("clear - Clear the chat for everyone");
+    console.log("stop - Stop the server");
     console.log("");
 
     return true;
   }
 
-  if (command === "/users") {
+  if (commandName === "users") {
     console.log("");
 
     if (clients.length === 0) {
@@ -42,11 +46,11 @@ function handleServerCommand(command, clients, server) {
     return true;
   }
 
-  if (command.startsWith("/say ")) {
-    const message = command.slice(5).trim();
+  if (commandName === "say") {
+    const message = parts.slice(1).join(" ").trim();
 
     if (!message) {
-      console.log("Usage: /say <message>");
+      console.log("Usage: say <message>");
 
       return true;
     }
@@ -60,8 +64,14 @@ function handleServerCommand(command, clients, server) {
     return true;
   }
 
-  if (command.startsWith("/kick ")) {
-    const targetUsername = command.slice(6).trim();
+  if (commandName === "kick") {
+    const targetUsername = parts.slice(1).join(" ").trim();
+
+    if (!targetUsername) {
+      console.log("Usage: kick <username>");
+
+      return true;
+    }
 
     const target = clients.find((client) => client.username.toLowerCase() === targetUsername.toLowerCase());
 
@@ -86,8 +96,14 @@ function handleServerCommand(command, clients, server) {
     return true;
   }
 
-  if (command.startsWith("/mute ")) {
-    const targetUsername = command.slice(6).trim();
+  if (commandName === "mute") {
+    const targetUsername = parts.slice(1).join(" ").trim();
+
+    if (!targetUsername) {
+      console.log("Usage: mute <username>");
+
+      return true;
+    }
 
     const target = clients.find((client) => client.username.toLowerCase() === targetUsername.toLowerCase());
 
@@ -114,8 +130,14 @@ function handleServerCommand(command, clients, server) {
     return true;
   }
 
-  if (command.startsWith("/unmute ")) {
-    const targetUsername = command.slice(8).trim();
+  if (commandName === "unmute") {
+    const targetUsername = parts.slice(1).join(" ").trim();
+
+    if (!targetUsername) {
+      console.log("Usage: unmute <username>");
+
+      return true;
+    }
 
     const target = clients.find((client) => client.username.toLowerCase() === targetUsername.toLowerCase());
 
@@ -136,7 +158,7 @@ function handleServerCommand(command, clients, server) {
     return true;
   }
 
-  if (command === "/clear") {
+  if (commandName === "clear") {
     clients.forEach((client) => {
       client.socket.write("CLEAR_CHAT\n");
     });
@@ -146,7 +168,7 @@ function handleServerCommand(command, clients, server) {
     return true;
   }
 
-  if (command === "/stop") {
+  if (commandName === "stop") {
     console.log("Stopping TChat server...");
 
     clients.forEach((client) => {
@@ -162,13 +184,9 @@ function handleServerCommand(command, clients, server) {
     return true;
   }
 
-  if (command.startsWith("/")) {
-    console.log(`Unknown server command: ${command}`);
+  console.log(`Unknown server command: ${command}`);
 
-    return true;
-  }
-
-  return false;
+  return true;
 }
 
 module.exports = {

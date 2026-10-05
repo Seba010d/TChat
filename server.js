@@ -107,7 +107,7 @@ console.log("● Port: 3000");
 console.log("● IP: 192.168.0.14");
 console.log("");
 
-console.log("Type /help for server commands.");
+console.log("Type help for server commands.");
 
 console.log("");
 
@@ -297,5 +297,7 @@ serverInput.on("line", (input) => {
 
   handleServerCommand(command, clients, server);
 
-  serverInput.prompt();
+  if (command.toLowerCase() !== "stop") {
+    serverInput.prompt();
+  }
 });
