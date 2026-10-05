@@ -9,6 +9,7 @@ function createUser(socket, username, color, isAdmin) {
     lastMessage: null,
     lastPrivateMessage: null,
     joinedAt: new Date(),
+    connectedAt: Date.now(),
     isAfk: false,
     afkMessage: "",
     messageCount: 0,

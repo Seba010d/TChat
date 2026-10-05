@@ -1,6 +1,6 @@
 const { colorMessage, colors } = require("./colors");
 
-function draw(messages, input, username, userColors) {
+function draw(messages, input, username, userColors, waitingForUsername = false) {
   const columns = process.stdout.columns || 80;
 
   const rows = process.stdout.rows || 24;
@@ -22,6 +22,24 @@ function draw(messages, input, username, userColors) {
   console.log(`${colors.brightCyan}╰${"─".repeat(width - 2)}╯${colors.reset}`);
 
   console.log("");
+
+  if (waitingForUsername) {
+    console.log(`${colors.brightCyan}Enter your username:${colors.reset}`);
+
+    console.log("");
+
+    console.log(`${colors.gray}${" ".repeat(2)}Username: ${colors.reset}${input}`);
+
+    console.log("");
+
+    console.log("");
+
+    console.log(`${colors.gray}${"─".repeat(width)}${colors.reset}`);
+
+    process.stdout.write(`${colors.brightGreen}> ${colors.reset}${input}`);
+
+    return;
+  }
 
   const availableRows = Math.max(1, rows - 8);
 

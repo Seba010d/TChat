@@ -1,5 +1,4 @@
 const net = require("net");
-const readline = require("readline");
 
 const { draw } = require("./ui");
 
@@ -15,15 +14,11 @@ let input = "";
 let messages = [];
 let userColors = {};
 let loggedIn = false;
+let waitingForUsername = false;
 let buffer = "";
 
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout,
-});
-
 function render() {
-  draw(messages, input, username, userColors);
+  draw(messages, input, username, userColors, waitingForUsername);
 }
 
 function addMessage(message) {
@@ -39,11 +34,7 @@ function addMessage(message) {
 socket.setEncoding("utf8");
 
 socket.connect(PORT, HOST, () => {
-  rl.question("Username: ", (name) => {
-    username = name.trim();
-
-    socket.write(username + "\n");
-  });
+  render();
 });
 
 socket.on("data", (data) => {
@@ -60,14 +51,23 @@ socket.on("data", (data) => {
       return;
     }
 
-    if (message.startsWith("USERNAME:")) {
+    if (message === "USERNAME:") {
+      waitingForUsername = true;
+
+      input = "";
+
+      render();
+
       return;
     }
 
     if (message.startsWith("WELCOME:")) {
       loggedIn = true;
+      waitingForUsername = false;
 
       username = message.substring(8);
+
+      input = "";
 
       render();
 
@@ -128,21 +128,29 @@ socket.on("error", (error) => {
 
 process.stdin.setRawMode(true);
 
+process.stdin.resume();
+
 process.stdin.on("data", (key) => {
   const value = key.toString();
 
   if (value === "\u0003") {
     socket.end();
+
     return;
   }
 
   if (value === "\r" || value === "\n") {
-    if (input.trim()) {
-      socket.write(input.trim() + "\n");
+    const text = input.trim();
 
-      input = "";
-      render();
+    if (!text) {
+      return;
     }
+
+    socket.write(text + "\n");
+
+    input = "";
+
+    render();
 
     return;
   }

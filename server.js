@@ -10,6 +10,8 @@ const { handleCommand } = require("./commands");
 
 const { addUserToRoom, removeUserFromRoom } = require("./rooms");
 
+const { startServerConsole } = require("./server-console");
+
 const clients = [];
 const userColors = {};
 
@@ -96,10 +98,6 @@ const server = net.createServer((socket) => {
           }
         });
 
-        history.slice(-20).forEach((item) => {
-          socket.write(`HISTORY:${item}\n`);
-        });
-
         clients.forEach((client) => {
           if (client.socket !== socket && !client.socket.destroyed) {
             client.socket.write(`SERVER: ${username} joined the chat\n`);
@@ -150,7 +148,7 @@ const server = net.createServer((socket) => {
         user.afkMessage = "";
         user.status = "Online";
 
-        broadcastRoomBack(clients, user.room, `SERVER: ${user.username} is back`);
+        broadcastRoom(clients, user.room, `SERVER: ${user.username} is back`);
       }
 
       user.messageCount++;
@@ -175,11 +173,7 @@ const server = net.createServer((socket) => {
         history.shift();
       }
 
-      clients.forEach((client) => {
-        if (client.room === roomName && !client.socket.destroyed) {
-          client.socket.write(formattedMessage + "\n");
-        }
-      });
+      broadcastRoom(clients, roomName, formattedMessage);
     });
   });
 
@@ -202,7 +196,7 @@ const server = net.createServer((socket) => {
   socket.on("error", () => {});
 });
 
-function broadcastRoomBack(clients, roomName, message) {
+function broadcastRoom(clients, roomName, message) {
   clients.forEach((client) => {
     if (client.room === roomName && !client.socket.destroyed) {
       client.socket.write(message + "\n");
@@ -214,4 +208,16 @@ server.listen(PORT, "0.0.0.0", () => {
   console.log(`${colors.brightCyan}TChat server running on port ${PORT}${colors.reset}`);
 
   console.log(`${colors.gray}Waiting for clients...${colors.reset}`);
+
+  startServerConsole({
+    clients,
+    server,
+    discoveryServer: {
+      close(callback) {
+        if (callback) {
+          callback();
+        }
+      },
+    },
+  });
 });
