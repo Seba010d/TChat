@@ -38,7 +38,7 @@ function handleCommand(socket, username, message, clients, history, serverInfo) 
   }
 
   if (isAdminCommand(message)) {
-    handleAdminCommand(socket, username, message, clients);
+    handleAdminCommand(socket, username, message, clients, serverInfo);
 
     return;
   }
@@ -369,46 +369,39 @@ function handleCommand(socket, username, message, clients, history, serverInfo) 
     send(socket, "HELP: Chat commands");
 
     send(socket, "HELP: /users - Show online users");
-
     send(socket, "HELP: /rooms - Show rooms");
-
     send(socket, "HELP: /join <room> - Join a room");
-
     send(socket, "HELP: /leave - Leave current room");
-
     send(socket, "HELP: /room - Show current room");
-
     send(socket, "HELP: /who - Show users in room");
-
     send(socket, "HELP: /nick <name> - Change username");
-
     send(socket, "HELP: /me <action> - Send an action");
-
     send(socket, "HELP: /afk [message] - Set AFK");
-
     send(socket, "HELP: /back - Remove AFK");
-
     send(socket, "HELP: /profile - Show profile");
-
     send(socket, "HELP: /stats - Show statistics");
-
     send(socket, "HELP: /msg <user> <message> - Private message");
-
     send(socket, "HELP: /last - Show last messages");
-
     send(socket, "HELP: /search <text> - Search messages");
-
     send(socket, "HELP: /ping - Check ping");
-
     send(socket, "HELP: /serverinfo - Server information");
-
     send(socket, "HELP: /motd - Server message");
-
     send(socket, "HELP: /admin-login - Log in as admin");
-
-    send(socket, "HELP: Admin: /clear /kick /mute /unmute /announce");
-
     send(socket, "HELP: /quit - Disconnect");
+
+    if (user.isAdmin) {
+      send(socket, "");
+      send(socket, "HELP: Admin commands");
+      send(socket, "HELP: /clear - Clear the chat");
+      send(socket, "HELP: /kick <user> - Kick a user");
+      send(socket, "HELP: /mute <user> - Mute a user");
+      send(socket, "HELP: /unmute <user> - Unmute a user");
+      send(socket, "HELP: /announce <text> - Send an admin announcement");
+      send(socket, "HELP: /broadcast <text> - Broadcast a message to everyone");
+      send(socket, "HELP: /warn <user> <reason> - Warn a user");
+      send(socket, "HELP: /admin-users - Show detailed user information");
+      send(socket, "HELP: /admin-stats - Show server statistics");
+    }
 
     return;
   }
