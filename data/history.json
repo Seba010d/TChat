@@ -1,0 +1,20 @@
+[
+  {
+    "id": 1,
+    "time": 1791229804894,
+    "room": "lobby",
+    "username": "Sebastian",
+    "color": "#f78166",
+    "text": "Hej",
+    "kind": "chat"
+  },
+  {
+    "id": 2,
+    "time": 1791229812969,
+    "room": "lobby",
+    "username": "Sebastian",
+    "color": "#f78166",
+    "text": "Hvad fu cker det her",
+    "kind": "chat"
+  }
+]
