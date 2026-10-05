@@ -1,10 +1,13 @@
 const net = require("net");
+const readline = require("readline");
 
 const { createUser, findUser, removeUser, isUsernameTaken } = require("./users");
 
 const { handleCommand } = require("./commands");
 
 const { isAdmin, isAdminCommand, handleAdminCommand } = require("./admin");
+
+const { handleServerCommand } = require("./serverCommands");
 
 const clients = [];
 
@@ -18,28 +21,6 @@ function getTime() {
 
 function serverLog(message) {
   console.log(`[${getTime()}] ${message}`);
-}
-
-function showServerHeader() {
-  console.clear();
-
-  console.log("╭────────────────────────────────────────╮");
-  console.log("│              TCHAT SERVER              │");
-  console.log("╰────────────────────────────────────────╯");
-
-  console.log("");
-  console.log("● Server online");
-  console.log("● Port: 3000");
-  console.log("● IP: 192.168.0.14");
-  console.log("● Users online: 0");
-  console.log("");
-
-  console.log("──────────────────────────────────────────");
-  console.log("");
-}
-
-function showUsersOnline() {
-  console.log(`● Users online: ${clients.length}`);
 }
 
 function getUserColor() {
@@ -97,7 +78,28 @@ function sendExistingColors(socket) {
   });
 }
 
-showServerHeader();
+console.clear();
+
+console.log("╭────────────────────────────────────────╮");
+
+console.log("│              TCHAT SERVER              │");
+
+console.log("╰────────────────────────────────────────╯");
+
+console.log("");
+
+console.log("● Server online");
+console.log("● Port: 3000");
+console.log("● IP: 192.168.0.14");
+console.log("");
+
+console.log("Type /help for server commands.");
+
+console.log("");
+
+console.log("──────────────────────────────────────────");
+
+console.log("");
 
 const server = net.createServer((socket) => {
   let username = "";
@@ -131,8 +133,6 @@ const server = net.createServer((socket) => {
       authenticated = true;
 
       serverLog(`${username} joined TChat.`);
-
-      showUsersOnline();
 
       socket.write(`Welcome, ${username}!\n`);
 
@@ -184,7 +184,7 @@ const server = net.createServer((socket) => {
       } else {
         socket.write("ADMIN_LOGIN_FAILED\n");
 
-        serverLog(`Failed admin login attempt by ${username}.`);
+        serverLog(`Failed admin login by ${username}.`);
       }
 
       return;
@@ -192,10 +192,6 @@ const server = net.createServer((socket) => {
 
     if (isAdminCommand(message)) {
       handleAdminCommand(socket, username, message, clients);
-
-      if (message === "/clear") {
-        serverLog(`${username} cleared the chat.`);
-      }
 
       return;
     }
@@ -230,8 +226,6 @@ const server = net.createServer((socket) => {
 
     serverLog(`${user.username} left TChat.`);
 
-    showUsersOnline();
-
     clients.forEach((client) => {
       client.socket.write(`${user.username} left TChat!\n`);
     });
@@ -246,4 +240,25 @@ const server = net.createServer((socket) => {
 
 server.listen(3000, () => {
   serverLog("TChat server is running.");
+});
+
+const serverInput = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout,
+  prompt: "> ",
+});
+
+serverInput.prompt();
+
+serverInput.on("line", (input) => {
+  const command = input.trim();
+
+  if (!command) {
+    serverInput.prompt();
+    return;
+  }
+
+  handleServerCommand(command, clients, server);
+
+  serverInput.prompt();
 });
