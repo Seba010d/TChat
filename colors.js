@@ -34,25 +34,34 @@ function colorMessage(message, userColors) {
     return "";
   }
 
-  if (message === "CLEAR_CHAT") {
+  if (message === "CLEAR_CHAT" || message.startsWith("HISTORY:")) {
     return "";
   }
 
-  // Server
   if (message.startsWith("SERVER:")) {
     return `${colors.cyan}${message}${colors.reset}`;
   }
 
-  // Admin
   if (message.startsWith("ADMIN:")) {
     return `${colors.brightRed}${message}${colors.reset}`;
+  }
+
+  if (message.startsWith("ME:")) {
+    return `${colors.brightPurple}${message.slice(3)}${colors.reset}`;
+  }
+
+  if (message.startsWith("MENTION:")) {
+    return `${colors.brightYellow}${message.slice(8)}${colors.reset}`;
+  }
+
+  if (message.startsWith("PROFILE:")) {
+    return `${colors.cyan}${message.slice(8)}${colors.reset}`;
   }
 
   if (message === "You are now logged in as ADMIN." || message === "You are already logged in as ADMIN." || message === "You are logged in as ADMIN.") {
     return `${colors.brightRed}${message}${colors.reset}`;
   }
 
-  // Help
   if (message === "TChat commands:") {
     return `${colors.brightPurple}${message}${colors.reset}`;
   }
@@ -61,17 +70,18 @@ function colorMessage(message, userColors) {
     return `${colors.brightRed}${message}${colors.reset}`;
   }
 
-  // Normal commands shown in help
-  if (message.startsWith("/users -") || message.startsWith("/help -") || message.startsWith("/quit -") || message.startsWith("/msg ") || message.startsWith("/whoami -")) {
+  if (message === "User commands:") {
+    return `${colors.brightPurple}${message}${colors.reset}`;
+  }
+
+  if (message.startsWith("/users -") || message.startsWith("/help -") || message.startsWith("/quit -") || message.startsWith("/msg ") || message.startsWith("/whoami -") || message.startsWith("/me -") || message.startsWith("/reply -") || message.startsWith("/last -") || message.startsWith("/profile -") || message.startsWith("/userinfo ") || message.startsWith("/status -") || message.startsWith("/online -")) {
     return `${colors.purple}${message}${colors.reset}`;
   }
 
-  // Admin commands shown in help
   if (message.startsWith("/clear -") || message.startsWith("/kick ") || message.startsWith("/mute ") || message.startsWith("/unmute ") || message.startsWith("/announce ")) {
     return `${colors.red}${message}${colors.reset}`;
   }
 
-  // Private messages
   if (message.startsWith("Private message from")) {
     return `${colors.brightPurple}${message}${colors.reset}`;
   }
@@ -80,17 +90,14 @@ function colorMessage(message, userColors) {
     return `${colors.brightPurple}${message}${colors.reset}`;
   }
 
-  // Join / leave
   if (message.includes("joined TChat!") || message.includes("left TChat!")) {
     return `${colors.yellow}${message}${colors.reset}`;
   }
 
-  // Errors
-  if (message.startsWith("Unknown command:") || (message.startsWith("User ") && message.includes("is not online.")) || message.includes("do not have permission") || message.includes("cannot") || message.includes("muted and cannot") || message.includes("Incorrect admin password") || message.includes("Usage:")) {
+  if (message.startsWith("Unknown command:") || (message.startsWith("User ") && message.includes("is not online.")) || message.includes("do not have permission") || message.includes("cannot") || message.includes("muted and cannot") || message.includes("Incorrect admin password") || message.includes("Usage:") || message.includes("not found")) {
     return `${colors.red}${message}${colors.reset}`;
   }
 
-  // Normal chat message
   const colonIndex = message.indexOf(":");
 
   if (colonIndex !== -1) {
@@ -100,10 +107,20 @@ function colorMessage(message, userColors) {
 
     const userColor = getUserColor(messageUsername, userColors);
 
-    return `${userColor}${messageUsername}${colors.reset}` + `${messageText}`;
+    return `${colors.gray}${getTimestamp(message)}${colors.reset} ` + `${userColor}${messageUsername}${colors.reset}` + `${messageText}`;
   }
 
   return `${colors.blue}${message}${colors.reset}`;
+}
+
+function getTimestamp(message) {
+  const match = message.match(/^\[(\d{2}:\d{2}:\d{2})\]/);
+
+  if (!match) {
+    return "";
+  }
+
+  return `[${match[1]}]`;
 }
 
 module.exports = {

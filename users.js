@@ -5,11 +5,14 @@ function createUser(socket, username, color, isAdmin) {
     color,
     isAdmin,
     muted: false,
+    status: "Online",
+    lastMessage: null,
+    joinedAt: new Date(),
   };
 }
 
 function findUser(clients, username) {
-  return clients.find((client) => client.username === username);
+  return clients.find((client) => client.username.toLowerCase() === username.toLowerCase());
 }
 
 function removeUser(clients, socket) {
@@ -26,9 +29,14 @@ function isUsernameTaken(clients, username) {
   return clients.some((client) => client.username.toLowerCase() === username.toLowerCase());
 }
 
+function getOnlineUsers(clients) {
+  return clients.filter((client) => client.socket && !client.socket.destroyed);
+}
+
 module.exports = {
   createUser,
   findUser,
   removeUser,
   isUsernameTaken,
+  getOnlineUsers,
 };

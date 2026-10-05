@@ -11,6 +11,8 @@ const { handleServerCommand } = require("./serverCommands");
 
 const clients = [];
 
+const history = [];
+
 function getTime() {
   return new Date().toLocaleTimeString("da-DK", {
     hour: "2-digit",
@@ -78,6 +80,24 @@ function sendExistingColors(socket) {
   });
 }
 
+function sendHistory(socket) {
+  if (history.length === 0) {
+    return;
+  }
+
+  history.forEach((message) => {
+    socket.write(`HISTORY:${message}\n`);
+  });
+}
+
+function addToHistory(message) {
+  history.push(message);
+
+  if (history.length > 100) {
+    history.shift();
+  }
+}
+
 function removeDisconnectedUser(socket) {
   const user = removeUser(clients, socket);
 
@@ -87,8 +107,10 @@ function removeDisconnectedUser(socket) {
 
   serverLog(`${user.username} left TChat.`);
 
+  const leaveMessage = `${user.username} left TChat!`;
+
   clients.forEach((client) => {
-    client.socket.write(`${user.username} left TChat!\n`);
+    client.socket.write(`${leaveMessage}\n`);
   });
 }
 
@@ -186,6 +208,8 @@ const server = net.createServer((socket) => {
 
       sendExistingColors(currentSocket);
 
+      sendHistory(currentSocket);
+
       sendUserColor(username, userColor);
 
       clients.forEach((client) => {
@@ -209,7 +233,6 @@ const server = net.createServer((socket) => {
       return;
     }
 
-    // Admin login
     if (message === "/admin-login") {
       if (user.isAdmin) {
         currentSocket.write("You are already logged in as ADMIN.\n");
@@ -222,7 +245,6 @@ const server = net.createServer((socket) => {
       return;
     }
 
-    // Admin password
     if (message.startsWith("ADMIN_PASSWORD:")) {
       const password = message.slice(15);
 
@@ -241,30 +263,48 @@ const server = net.createServer((socket) => {
       return;
     }
 
-    // Admin commands
     if (isAdminCommand(message)) {
       handleAdminCommand(currentSocket, username, message, clients);
 
       return;
     }
 
-    // Normal commands
-    if (handleCommand(currentSocket, username, message, clients)) {
+    if (handleCommand(currentSocket, username, message, clients, history)) {
       return;
     }
 
-    // Muted users
     if (user.muted) {
       currentSocket.write("You are muted and cannot send messages.\n");
 
       return;
     }
 
-    // Normal chat
+    if (message.length > 500) {
+      currentSocket.write("Message cannot be longer than 500 characters.\n");
+
+      return;
+    }
+
+    const formattedMessage = `[${getTime()}] ${username}: ${message}`;
+
+    addToHistory(formattedMessage);
+
+    user.lastMessage = message;
+
     serverLog(`${username}: ${message}`);
 
     clients.forEach((client) => {
-      client.socket.write(`${username}: ${message}\n`);
+      let output = formattedMessage;
+
+      const mentionRegex = /@([A-Za-z0-9_-]+)/g;
+
+      const mentions = message.match(mentionRegex);
+
+      if (mentions && mentions.some((mention) => mention.slice(1).toLowerCase() === client.username.toLowerCase())) {
+        output = `MENTION:${formattedMessage}`;
+      }
+
+      client.socket.write(`${output}\n`);
     });
   }
 
@@ -332,6 +372,7 @@ serverInput.on("line", (input) => {
 
   if (!command) {
     serverInput.prompt();
+
     return;
   }
 

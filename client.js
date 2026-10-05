@@ -63,6 +63,7 @@ function processServerMessage(message, client) {
     }
 
     const user = parts[1];
+
     const rgb = parts[2].split(",");
 
     if (rgb.length !== 3) {
@@ -122,6 +123,16 @@ function processServerMessage(message, client) {
 
   if (message === "CLEAR_CHAT") {
     messages = [];
+
+    return;
+  }
+
+  if (message.startsWith("HISTORY:")) {
+    const historyMessage = message.slice(8);
+
+    if (historyMessage) {
+      messages.push(historyMessage);
+    }
 
     return;
   }
@@ -188,7 +199,6 @@ function connectToServer() {
 
         const keyValue = key.toString();
 
-        // Control + C
         if (keyValue === "\u0003") {
           process.stdin.setRawMode(false);
 
@@ -199,7 +209,6 @@ function connectToServer() {
           return;
         }
 
-        // Enter
         if (keyValue === "\r" || keyValue === "\n") {
           if (input.trim() === "") {
             return;
@@ -224,7 +233,6 @@ function connectToServer() {
           return;
         }
 
-        // Backspace
         if (keyValue === "\u007f") {
           input = input.slice(0, -1);
 
@@ -233,7 +241,6 @@ function connectToServer() {
           return;
         }
 
-        // Ignore other control characters
         if (keyValue.charCodeAt(0) < 32) {
           return;
         }

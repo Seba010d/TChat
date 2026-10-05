@@ -6,14 +6,25 @@ function handleServerCommand(command, clients, server) {
   if (commandName === "help") {
     console.log("");
     console.log("Server commands:");
+
     console.log("help - Show server commands");
+
     console.log("users - Show online users");
+
     console.log("say <message> - Send a message to everyone");
+
     console.log("kick <username> - Kick a user");
+
     console.log("mute <username> - Mute a user");
+
     console.log("unmute <username> - Unmute a user");
+
     console.log("clear - Clear the chat for everyone");
+
+    console.log("stats - Show server statistics");
+
     console.log("stop - Stop the server");
+
     console.log("");
 
     return true;
@@ -38,7 +49,7 @@ function handleServerCommand(command, clients, server) {
           status += " [MUTED]";
         }
 
-        console.log(`  • ${client.username}${status}`);
+        console.log(`  • ${client.username} - ${client.status}${status}`);
       });
     }
 
@@ -165,6 +176,22 @@ function handleServerCommand(command, clients, server) {
     });
 
     console.log("Chat cleared for everyone.");
+
+    return true;
+  }
+
+  if (commandName === "stats") {
+    console.log("");
+
+    console.log("TChat server statistics:");
+
+    console.log(`Online users: ${clients.length}`);
+
+    console.log(`Admins online: ${clients.filter((client) => client.isAdmin).length}`);
+
+    console.log(`Muted users: ${clients.filter((client) => client.muted).length}`);
+
+    console.log("");
 
     return true;
   }
