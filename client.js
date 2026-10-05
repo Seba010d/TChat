@@ -2,6 +2,7 @@ const net = require("net");
 const readline = require("readline");
 
 const { draw } = require("./ui");
+const { colors } = require("./colors");
 
 let username = "";
 let input = "";
@@ -17,19 +18,30 @@ const rl = readline.createInterface({
 function showLogin() {
   console.clear();
 
-  console.log("╭────────────────────────────────────────╮");
-  console.log("│                  TCHAT                 │");
-  console.log("╰────────────────────────────────────────╯");
+  console.log(`${colors.brightCyan}╭────────────────────────────────────────╮${colors.reset}`);
+
+  console.log(`${colors.brightCyan}│${colors.reset}` + `              ${colors.brightPurple}TCHAT${colors.reset}` + `              ${colors.brightCyan}│${colors.reset}`);
+
+  console.log(`${colors.brightCyan}╰────────────────────────────────────────╯${colors.reset}`);
 
   console.log("");
-  console.log("Choose your username.");
+
+  console.log(`${colors.brightBlue}Choose your username.${colors.reset}`);
+
   console.log("");
 
-  rl.question("> ", (name) => {
+  rl.question(`${colors.brightGreen}Username${colors.reset} ${colors.gray}(required)${colors.reset}\n` + `${colors.yellow}> ${colors.reset}`, (name) => {
     username = name.trim();
 
     if (!username) {
-      showLogin();
+      console.log("");
+
+      console.log(`${colors.red}Username cannot be empty.${colors.reset}`);
+
+      setTimeout(() => {
+        showLogin();
+      }, 800);
+
       return;
     }
 
@@ -53,11 +65,15 @@ function connectToServer() {
       process.stdin.on("data", (key) => {
         const keyValue = key.toString();
 
-        // Ctrl + C
+        // Control + C
         if (keyValue === "\u0003") {
           process.stdin.setRawMode(false);
-          client.end();
-          process.exit();
+
+          client.end(() => {
+            process.exit(0);
+          });
+
+          return;
         }
 
         // Enter
@@ -68,8 +84,12 @@ function connectToServer() {
 
           if (input === "/quit") {
             process.stdin.setRawMode(false);
-            client.end();
-            process.exit();
+
+            client.end(() => {
+              process.exit(0);
+            });
+
+            return;
           }
 
           client.write(input + "\n");
@@ -107,6 +127,7 @@ function connectToServer() {
       .filter((message) => message !== "");
 
     newMessages.forEach((message) => {
+      // User color
       if (message.startsWith("USER_COLOR:")) {
         const parts = message.split(":");
 
@@ -122,20 +143,22 @@ function connectToServer() {
         return;
       }
 
+      // Admin password request
       if (message === "ADMIN_PASSWORD_REQUIRED") {
         waitingForAdminPassword = true;
 
         process.stdin.setRawMode(false);
 
         console.log("");
-        console.log("Admin adgangskode:");
+
+        console.log(`${colors.brightPurple}Admin adgangskode:${colors.reset}`);
 
         const passwordRl = readline.createInterface({
           input: process.stdin,
           output: process.stdout,
         });
 
-        passwordRl.question("> ", (password) => {
+        passwordRl.question(`${colors.yellow}> ${colors.reset}`, (password) => {
           passwordRl.close();
 
           waitingForAdminPassword = false;
@@ -151,30 +174,37 @@ function connectToServer() {
         return;
       }
 
+      // Admin login success
       if (message === "ADMIN_LOGIN_SUCCESS") {
         messages.push("You are now logged in as ADMIN.");
 
         return;
       }
 
+      // Admin login failed
       if (message === "ADMIN_LOGIN_FAILED") {
         messages.push("Incorrect admin password.");
 
         return;
       }
 
+      // Clear chat
       if (message === "CLEAR_CHAT") {
         messages = [];
 
         return;
       }
 
+      // Authentication failed
       if (message.startsWith("AUTH_FAILED:")) {
         process.stdin.setRawMode(false);
 
-        console.log(message.replace("AUTH_FAILED:", ""));
+        console.clear();
+
+        console.log(`${colors.red}${message.replace("AUTH_FAILED:", "")}${colors.reset}`);
 
         client.end();
+
         process.exit();
       }
 
@@ -191,12 +221,15 @@ function connectToServer() {
 
     console.clear();
 
-    console.log("╭────────────────────────────────────────╮");
-    console.log("│              TCHAT ERROR               │");
-    console.log("╰────────────────────────────────────────╯");
+    console.log(`${colors.brightCyan}╭────────────────────────────────────────╮${colors.reset}`);
+
+    console.log(`${colors.brightCyan}│${colors.reset}` + `              ${colors.red}TCHAT ERROR${colors.reset}` + `               ${colors.brightCyan}│${colors.reset}`);
+
+    console.log(`${colors.brightCyan}╰────────────────────────────────────────╯${colors.reset}`);
 
     console.log("");
-    console.log(`Connection error: ${error.message}`);
+
+    console.log(`${colors.red}Connection error:${colors.reset} ${error.message}`);
 
     process.exit(1);
   });
@@ -205,7 +238,8 @@ function connectToServer() {
     process.stdin.setRawMode(false);
 
     console.log("");
-    console.log("Disconnected from TChat.");
+
+    console.log(`${colors.yellow}Disconnected from TChat.${colors.reset}`);
 
     process.exit();
   });
